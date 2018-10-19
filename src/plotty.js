@@ -128,17 +128,17 @@ function renderColorScaleToCanvas(name, canvas) {
   const ctx = canvas.getContext('2d');
 
   if (Object.prototype.toString.call(csDef) === '[object Object]') {
-    canvas.width = 256;
-    const gradient = ctx.createLinearGradient(0, 0, 256, 1);
+    const w = canvas.width;
+    const gradient = ctx.createLinearGradient(0, 0, w, 256/w);
 
     for (let i = 0; i < csDef.colors.length; ++i) {
       gradient.addColorStop(csDef.positions[i], csDef.colors[i]);
     }
     ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, 256, 1);
+    ctx.fillRect(0, 0, w, 1);
   } else if (Object.prototype.toString.call(csDef) === '[object Uint8Array]') {
-    canvas.width = 256;
-    const imgData = ctx.createImageData(256, 1);
+    const w = canvas.width;
+    const imgData = ctx.createImageData(w, 1);
     imgData.data.set(csDef);
     ctx.putImageData(imgData, 0, 0);
   } else {
