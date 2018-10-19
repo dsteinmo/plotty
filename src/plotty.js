@@ -151,7 +151,6 @@ const vertexShaderSource = `
 attribute vec2 a_position;
 attribute vec2 a_texCoord;
 uniform mat3 u_matrix;
-uniform vec2 u_resolution;
 uniform vec2 u_diff;
 varying vec2 v_texCoord;
 void main() {
@@ -504,13 +503,29 @@ class plot {
     canvas.width = dataset.width;
     canvas.height = dataset.height;
 
+    const origWidth = canvas.width;
+    const origHeight = canvas.height;
+
+    // Lookup the size the browser is displaying the canvas.
+    var displayWidth  = canvas.clientWidth;
+    var displayHeight = canvas.clientHeight;
+
+    // Check if the canvas is not the same size.
+    if (canvas.width  !== displayWidth ||
+        canvas.height !== displayHeight) {
+
+      // Make the canvas the same size
+      canvas.width  = displayWidth;
+      canvas.height = displayHeight;
+    }
+
     if (this.gl) {
 
       const x1 = 0;
       const y1 = 0;
 
-      const x2 = canvas.width;
-      const y2 = canvas.height;
+      const x2 = origWidth;
+      const y2 = origHeight;
 
       // assume row-major ordering (i.e., 'm[1,2]' => m[1*3+2])
       const m = this.matrix;
@@ -531,7 +546,10 @@ class plot {
       const ynew_diff = ynew_max - ynew_min;
 
       const gl = this.gl;
-      gl.viewport(0, 0, dataset.width, dataset.height);
+      canvas.width = xnew_diff;
+      canvas.height = ynew_diff;
+      gl.viewport(0, 0, canvas.width, canvas.height);
+
       gl.useProgram(this.program);
 
       // set the images
@@ -545,15 +563,12 @@ class plot {
 
       const positionLocation = gl.getAttribLocation(this.program, 'a_position');
       const domainLocation = gl.getUniformLocation(this.program, 'u_domain');
-      const resolutionLocation = gl.getUniformLocation(this.program, 'u_resolution');
       const diffLocation = gl.getUniformLocation(this.program, 'u_diff');
       const noDataValueLocation = gl.getUniformLocation(this.program, 'u_noDataValue');
       const clampLowLocation = gl.getUniformLocation(this.program, 'u_clampLow');
       const clampHighLocation = gl.getUniformLocation(this.program, 'u_clampHigh');
       const matrixLocation = gl.getUniformLocation(this.program, 'u_matrix');
 
-      //gl.uniform2f(resolutionLocation, canvas.width, canvas.height);
-      gl.uniform2f(resolutionLocation, canvas.width, canvas.height);
       gl.uniform2f(diffLocation, xnew_diff, ynew_diff);
       gl.uniform2fv(domainLocation, this.domain);
       gl.uniform1i(clampLowLocation, this.clampLow);
@@ -566,7 +581,16 @@ class plot {
       gl.enableVertexAttribArray(positionLocation);
       gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
 
-      setRectangle(gl, xnew_min, ynew_min, xnew_diff, ynew_diff);
+      // Determine transformation for bounding rectangle.
+      const xScale = origWidth / xnew_diff;
+      const yScale = origHeight / ynew_diff;
+
+      const recx = xnew_min*xScale;
+      const recy = ynew_min*yScale;
+
+      const recWidth = xnew_diff*xScale;
+      const recHeight = ynew_diff*yScale;
+      setRectangle(gl, recx, recy, recWidth, recHeight);
 
       // Draw the rectangle.
       gl.drawArrays(gl.TRIANGLES, 0, 6);
