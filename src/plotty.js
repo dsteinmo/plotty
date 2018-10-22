@@ -2,7 +2,8 @@
  * The main plotty module.
  * @module plotty
  * @name plotty
- * @author: Daniel Santillan
+ * @author: Daniel Santillan,
+ * forked and modified by Derek Steinmoeller
  */
 
 /**
@@ -127,17 +128,17 @@ function renderColorScaleToCanvas(name, canvas) {
   const ctx = canvas.getContext('2d');
 
   if (Object.prototype.toString.call(csDef) === '[object Object]') {
-    canvas.width = 256;
-    const gradient = ctx.createLinearGradient(0, 0, 256, 1);
+    const w = canvas.width;
+    const gradient = ctx.createLinearGradient(0, 0, w, 256/w);
 
     for (let i = 0; i < csDef.colors.length; ++i) {
       gradient.addColorStop(csDef.positions[i], csDef.colors[i]);
     }
     ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, 256, 1);
+    ctx.fillRect(0, 0, w, 1);
   } else if (Object.prototype.toString.call(csDef) === '[object Uint8Array]') {
-    canvas.width = 256;
-    const imgData = ctx.createImageData(256, 1);
+    const w = canvas.width;
+    const imgData = ctx.createImageData(w, 1);
     imgData.data.set(csDef);
     ctx.putImageData(imgData, 0, 0);
   } else {
@@ -150,18 +151,16 @@ const vertexShaderSource = `
 attribute vec2 a_position;
 attribute vec2 a_texCoord;
 uniform mat3 u_matrix;
-uniform vec2 u_resolution;
+uniform vec2 u_diff;
 varying vec2 v_texCoord;
 void main() {
   // apply transformation matrix
   vec2 position = (u_matrix * vec3(a_position, 1)).xy;
-  // convert the rectangle from pixels to 0.0 to 1.0
-  vec2 zeroToOne = position / u_resolution;
-  // convert from 0->1 to 0->2
-  vec2 zeroToTwo = zeroToOne * 2.0;
-  // convert from 0->2 to -1->+1 (clipspace)
-  vec2 clipSpace = zeroToTwo - 1.0;
-  gl_Position = vec4(clipSpace * vec2(1, -1), 0, 1);
+
+  // Map the position to clipspace (barycentric coordinates).
+  vec2 clipSpace = 2.0*position/u_diff - 1.0; //Derek
+
+  gl_Position = vec4(clipSpace * vec2(1, -1), 0, 1); // original
   // pass the texCoord to the fragment shader
   // The GPU will interpolate this value between points.
   v_texCoord = a_texCoord;
@@ -504,10 +503,55 @@ class plot {
     canvas.width = dataset.width;
     canvas.height = dataset.height;
 
+    const origWidth = canvas.width;
+    const origHeight = canvas.height;
+
+    // Lookup the size the browser is displaying the canvas.
+    var displayWidth  = canvas.clientWidth;
+    var displayHeight = canvas.clientHeight;
+
+    // Check if the canvas is not the same size.
+    if (canvas.width  !== displayWidth ||
+        canvas.height !== displayHeight) {
+
+      // Make the canvas the same size
+      canvas.width  = displayWidth;
+      canvas.height = displayHeight;
+    }
+
     if (this.gl) {
+
+      const x1 = 0;
+      const y1 = 0;
+
+      const x2 = origWidth;
+      const y2 = origHeight;
+
+      // assume row-major ordering (i.e., 'm[1,2]' => m[1*3+2])
+      const m = this.matrix;
+
+      const x1new = m[0]*x1 + m[1]*y1 + m[2];
+      const y1new = m[3]*x1 + m[4]*y1 + m[5];
+
+      const x2new = m[0]*x2 + m[1]*y2 + m[2];
+      const y2new = m[3]*x2 + m[4]*y2 + m[5];
+
+      const xnew_min = Math.min(x1new, x2new);
+      const xnew_max = Math.max(x1new, x2new);
+
+      const ynew_min = Math.min(y1new, y2new);
+      const ynew_max = Math.max(y1new, y2new);
+
+      const xnew_diff = xnew_max - xnew_min;
+      const ynew_diff = ynew_max - ynew_min;
+
       const gl = this.gl;
-      gl.viewport(0, 0, dataset.width, dataset.height);
+      canvas.width = xnew_diff;
+      canvas.height = ynew_diff;
+      gl.viewport(0, 0, canvas.width, canvas.height);
+
       gl.useProgram(this.program);
+
       // set the images
       gl.uniform1i(gl.getUniformLocation(this.program, 'u_textureData'), 0);
       gl.uniform1i(gl.getUniformLocation(this.program, 'u_textureScale'), 1);
@@ -519,13 +563,13 @@ class plot {
 
       const positionLocation = gl.getAttribLocation(this.program, 'a_position');
       const domainLocation = gl.getUniformLocation(this.program, 'u_domain');
-      const resolutionLocation = gl.getUniformLocation(this.program, 'u_resolution');
+      const diffLocation = gl.getUniformLocation(this.program, 'u_diff');
       const noDataValueLocation = gl.getUniformLocation(this.program, 'u_noDataValue');
       const clampLowLocation = gl.getUniformLocation(this.program, 'u_clampLow');
       const clampHighLocation = gl.getUniformLocation(this.program, 'u_clampHigh');
       const matrixLocation = gl.getUniformLocation(this.program, 'u_matrix');
 
-      gl.uniform2f(resolutionLocation, canvas.width, canvas.height);
+      gl.uniform2f(diffLocation, xnew_diff, ynew_diff);
       gl.uniform2fv(domainLocation, this.domain);
       gl.uniform1i(clampLowLocation, this.clampLow);
       gl.uniform1i(clampHighLocation, this.clampHigh);
@@ -537,8 +581,16 @@ class plot {
       gl.enableVertexAttribArray(positionLocation);
       gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
 
+      // Determine transformation for bounding rectangle.
+      const xScale = origWidth / xnew_diff;
+      const yScale = origHeight / ynew_diff;
 
-      setRectangle(gl, 0, 0, canvas.width, canvas.height);
+      const recx = xnew_min*xScale;
+      const recy = ynew_min*yScale;
+
+      const recWidth = xnew_diff*xScale;
+      const recHeight = ynew_diff*yScale;
+      setRectangle(gl, recx, recy, recWidth, recHeight);
 
       // Draw the rectangle.
       gl.drawArrays(gl.TRIANGLES, 0, 6);
