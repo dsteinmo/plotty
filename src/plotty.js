@@ -71,7 +71,7 @@ function setRectangle(gl, x, y, width, height) {
     x2, y2]), gl.STATIC_DRAW);
 }
 
-function createDataset(gl, id, data, width, height) {
+function createDataset(gl, id, data, width, height, ndv) {
   let textureData;
   if (gl) {
     gl.viewport(0, 0, width, height);
@@ -84,11 +84,14 @@ function createDataset(gl, id, data, width, height) {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
 
+    let filteredData = new Float32Array(data);
+    filteredData = filteredData.map( d => isNaN(d) ? ndv : d);
     // Upload the image into the texture.
+
     gl.texImage2D(gl.TEXTURE_2D, 0,
       gl.LUMINANCE,
       width, height, 0,
-      gl.LUMINANCE, gl.FLOAT, new Float32Array(data)
+      gl.LUMINANCE, gl.FLOAT, filteredData
     );
   }
   return { textureData, width, height, data, id };
@@ -184,7 +187,7 @@ void main() {
   vec2 onePixel = vec2(1.0, 1.0) / u_textureSize;
   float value = texture2D(u_textureData, v_texCoord)[0];
   if (value == u_noDataValue)
-    gl_FragColor = vec4(0.0, 0, 0, 0.0);
+    gl_FragColor = vec4(255, 255, 255, 0.0);
   else if ((!u_clampLow && value < u_domain[0]) || (!u_clampHigh && value > u_domain[1]))
     gl_FragColor = vec4(0, 0, 0, 0);
   else {
@@ -329,7 +332,7 @@ class plot {
     if (this.currentDataset && this.currentDataset.id === null) {
       destroyDataset(this.gl, this.currentDataset);
     }
-    this.currentDataset = createDataset(this.gl, null, data, width, height);
+    this.currentDataset = createDataset(this.gl, null, data, width, height, this.noDataValue);
   }
 
   /**
@@ -345,7 +348,7 @@ class plot {
     if (this.datasetAvailable(id)) {
       throw new Error(`There is already a dataset registered with id '${id}'`);
     }
-    this.datasetCollection[id] = createDataset(this.gl, id, data, width, height);
+    this.datasetCollection[id] = createDataset(this.gl, id, data, width, height, this.noDataValue);
     if (!this.currentDataset) {
       this.currentDataset = this.datasetCollection[id];
     }
