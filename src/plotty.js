@@ -464,7 +464,7 @@ class plot {
       this.colorScaleCanvas.width = 256;
       this.colorScaleCanvas.height = 1;
     }
-    renderColorScaleToCanvas(name, this.colorScaleCanvas, this.currentDataset);
+    renderColorScaleToCanvas(name, this.colorScaleCanvas, null);
     this.name = name;
     this.setColorScaleImage(this.colorScaleCanvas);
   }
