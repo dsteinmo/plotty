@@ -124,10 +124,10 @@ function addColorScale(name, colors, positions) {
  * @param {String} name the name of the color scale to render
  * @param {HTMLCanvasElement} canvas the canvas to render to
  */
-function renderColorScaleToCanvas(name, canvas) {
+function renderColorScaleToCanvas(name, canvas, caxis) {
   /* eslint-disable no-param-reassign */
   const csDef = colorscales[name];
-  canvas.height = 1;
+  canvas.height = 17;
   const ctx = canvas.getContext('2d');
 
   if (Object.prototype.toString.call(csDef) === '[object Object]') {
@@ -138,12 +138,32 @@ function renderColorScaleToCanvas(name, canvas) {
       gradient.addColorStop(csDef.positions[i], csDef.colors[i]);
     }
     ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, w, 1);
+    ctx.fillRect(0, 0, w, 5);
+
+    ctx.font = "10px Consolas";
+    ctx.fillStyle = "black";
+
+    if (caxis) {
+      const low = caxis[0].toString();
+      const high = caxis[1].toString();
+      ctx.fillText(low, 0, canvas.height-1);
+      ctx.fillText(high, canvas.width-5*high.length + 1, canvas.height-1);
+    }
   } else if (Object.prototype.toString.call(csDef) === '[object Uint8Array]') {
     const w = canvas.width;
-    const imgData = ctx.createImageData(w, 1);
+    const imgData = ctx.createImageData(w, 5);
     imgData.data.set(csDef);
     ctx.putImageData(imgData, 0, 0);
+
+    ctx.font = "10px Consolas";
+    ctx.fillStyle = "black";
+
+    if (caxis) {
+      const low = caxis[0].toString();
+      const high = caxis[1].toString();
+      ctx.fillText(low, 0, canvas.height-1);
+      ctx.fillText(high, canvas.width-5*high.length + 1, canvas.height-1);
+    }
   } else {
     throw new Error('Color scale not defined.');
   }
@@ -444,7 +464,7 @@ class plot {
       this.colorScaleCanvas.width = 256;
       this.colorScaleCanvas.height = 1;
     }
-    renderColorScaleToCanvas(name, this.colorScaleCanvas);
+    renderColorScaleToCanvas(name, this.colorScaleCanvas, null);
     this.name = name;
     this.setColorScaleImage(this.colorScaleCanvas);
   }
