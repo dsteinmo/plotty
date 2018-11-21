@@ -193,12 +193,13 @@ void main() {
 // Definition of fragment shader
 const fragmentShaderSource = `
 precision mediump float;
-// our textur
+// our texture
 uniform sampler2D u_textureData;
 uniform sampler2D u_textureScale;
 uniform vec2 u_textureSize;
 uniform vec2 u_domain;
 uniform float u_noDataValue;
+uniform float u_alpha;
 uniform bool u_clampLow;
 uniform bool u_clampHigh;
 // the texCoords passed in from the vertex shader.
@@ -213,6 +214,8 @@ void main() {
   else {
     float normalisedValue = (value - u_domain[0]) / (u_domain[1] - u_domain[0]);
     gl_FragColor = texture2D(u_textureScale, vec2(normalisedValue, 0));
+    gl_FragColor.a = u_alpha;
+
   }
 }`;
 
@@ -239,6 +242,8 @@ void main() {
  *                                       hidden
  *
  * @param {Array} [options.matrix] Transformation matrix
+ *
+ * @param {Array} [options.alpha] Global alpha parameter to blend with the image
  *
  */
 class plot {
@@ -284,6 +289,7 @@ class plot {
     this.setDomain(defaultFor(options.domain, [0, 1]));
     this.setClamp(defaultFor(options.clampLow, true), options.clampHigh);
     this.setNoDataValue(options.noDataValue);
+    this.setAlpha(options.alpha);
 
     if (options.data) {
       const l = options.data.length;
@@ -516,6 +522,10 @@ class plot {
     this.noDataValue = noDataValue;
   }
 
+  setAlpha(alpha) {
+    this.alpha = alpha;
+  }
+
   /**
    * Render the map to the specified canvas with the given settings.
    */
@@ -573,6 +583,9 @@ class plot {
       canvas.height = ynew_diff;
       gl.viewport(0, 0, canvas.width, canvas.height);
 
+      gl.enable(gl.BLEND);
+      gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
       gl.useProgram(this.program);
 
       // set the images
@@ -588,6 +601,7 @@ class plot {
       const domainLocation = gl.getUniformLocation(this.program, 'u_domain');
       const diffLocation = gl.getUniformLocation(this.program, 'u_diff');
       const noDataValueLocation = gl.getUniformLocation(this.program, 'u_noDataValue');
+      const alphaLocation = gl.getUniformLocation(this.program, 'u_alpha');
       const clampLowLocation = gl.getUniformLocation(this.program, 'u_clampLow');
       const clampHighLocation = gl.getUniformLocation(this.program, 'u_clampHigh');
       const matrixLocation = gl.getUniformLocation(this.program, 'u_matrix');
@@ -597,6 +611,7 @@ class plot {
       gl.uniform1i(clampLowLocation, this.clampLow);
       gl.uniform1i(clampHighLocation, this.clampHigh);
       gl.uniform1f(noDataValueLocation, this.noDataValue);
+      gl.uniform1f(alphaLocation, this.alpha);
       gl.uniformMatrix3fv(matrixLocation, false, this.matrix);
 
       const positionBuffer = gl.createBuffer();
