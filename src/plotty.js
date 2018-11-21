@@ -284,6 +284,10 @@ class plot {
     this.setDomain(defaultFor(options.domain, [0, 1]));
     this.setClamp(defaultFor(options.clampLow, true), options.clampHigh);
     this.setNoDataValue(options.noDataValue);
+<<<<<<< HEAD
+=======
+    this.setAlpha(options.alpha || 1);
+>>>>>>> 27d5e4e... Fix bug where we don't plot if alpha not set.
 
     if (options.data) {
       const l = options.data.length;
