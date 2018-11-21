@@ -193,7 +193,7 @@ void main() {
 // Definition of fragment shader
 const fragmentShaderSource = `
 precision mediump float;
-// our textur
+// our texture
 uniform sampler2D u_textureData;
 uniform sampler2D u_textureScale;
 uniform vec2 u_textureSize;
@@ -213,6 +213,8 @@ void main() {
   else {
     float normalisedValue = (value - u_domain[0]) / (u_domain[1] - u_domain[0]);
     gl_FragColor = texture2D(u_textureScale, vec2(normalisedValue, 0));
+    gl_FragColor.a = 0.5;
+
   }
 }`;
 
@@ -572,6 +574,10 @@ class plot {
       canvas.width = xnew_diff;
       canvas.height = ynew_diff;
       gl.viewport(0, 0, canvas.width, canvas.height);
+
+      // Derek enable blending.
+      gl.glEnable(GL.GL_BLEND);
+      gl.glBlendFunc(GL.GL_SRC_ALPHA, GL.GL_ONE_MINUS_SRC_ALPHA);
 
       gl.useProgram(this.program);
 
